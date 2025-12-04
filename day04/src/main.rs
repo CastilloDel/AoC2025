@@ -14,31 +14,56 @@ use nom::{
 
 fn main() {
     let contents = fs::read_to_string("input").unwrap();
-    let result = day02_part1(&contents);
-    println!("Day02 part 1 result: {result}");
+    let result = day04_part1(&contents);
+    println!("Day04 part 1 result: {result}");
+    let result = day04_part2(&contents);
+    println!("Day04 part 2 result: {result}");
 }
 
-fn day02_part1(input: &str) -> usize {
+fn day04_part1(input: &str) -> usize {
     let (_, matrix) = read_input(input).unwrap();
-    (0..matrix.m())
-        .map(|i| {
-            (0..matrix.n())
-                .map(|j| (i, j))
-                .filter(|&pos| matrix[pos] == Cell::Paper)
-                .filter(|&pos| {
-                    matrix
+    matrix
+        .iter()
+        .filter(|&pos| matrix[pos] == Cell::Paper)
+        .filter(|&pos| {
+            matrix
+                .get_neighbors(pos)
+                .into_iter()
+                .filter(|&neighbour| matrix[neighbour] == Cell::Paper)
+                .count()
+                < 4
+        })
+        .count()
+}
+
+fn day04_part2(input: &str) -> usize {
+    let (_, mut matrix) = read_input(input).unwrap();
+    let mut total_changes = 0;
+    loop {
+        let removed = matrix
+            .iter()
+            .filter(|&pos| {
+                matrix[pos] == Cell::Paper
+                    && matrix
                         .get_neighbors(pos)
                         .into_iter()
                         .filter(|&neighbour| matrix[neighbour] == Cell::Paper)
                         .count()
                         < 4
-                })
-                .count()
-        })
-        .sum()
+            })
+            .collect::<Vec<Position>>();
+        if removed.is_empty() {
+            break;
+        }
+        total_changes += removed.len();
+        for pos in removed {
+            matrix[pos] = Cell::Empty
+        }
+    }
+    total_changes
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum Cell {
     Paper,
     Empty,
@@ -86,6 +111,10 @@ impl<T> Matrix<T> {
     fn n(&self) -> usize {
         self.inner[0].len()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = Position> {
+        (0..self.m()).flat_map(|i| (0..self.n()).map(move |j| (i, j)))
+    }
 }
 
 impl<T> Index<Position> for Matrix<T> {
@@ -122,14 +151,28 @@ mod tests {
     #[test]
     fn part1_correct_output_for_test_input() {
         let contents = fs::read_to_string("test_input").unwrap();
-        let result = day02_part1(&contents);
+        let result = day04_part1(&contents);
         assert_eq!(result, 13);
     }
 
     #[test]
     fn part1_correct_output_for_input() {
         let contents = fs::read_to_string("input").unwrap();
-        let result = day02_part1(&contents);
+        let result = day04_part1(&contents);
         assert_eq!(result, 1518);
+    }
+
+    #[test]
+    fn part2_correct_output_for_test_input() {
+        let contents = fs::read_to_string("test_input").unwrap();
+        let result = day04_part2(&contents);
+        assert_eq!(result, 43);
+    }
+
+    #[test]
+    fn part2_correct_output_for_input() {
+        let contents = fs::read_to_string("input").unwrap();
+        let result = day04_part2(&contents);
+        assert_eq!(result, 2528);
     }
 }
