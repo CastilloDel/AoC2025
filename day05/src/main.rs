@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs, ops::RangeInclusive};
+use std::{cmp::max, collections::HashSet, fs, ops::RangeInclusive};
 
 use nom::{
     IResult, Parser,
@@ -13,6 +13,8 @@ fn main() {
     let contents = fs::read_to_string("input").unwrap();
     let result = day05_part1(&contents);
     println!("Day05 part 1 result: {result}");
+    let result = day05_part2(&contents);
+    println!("Day05 part 2 result: {result}");
 }
 
 fn day05_part1(input: &str) -> usize {
@@ -22,6 +24,27 @@ fn day05_part1(input: &str) -> usize {
         rotten_ingredients.retain(|ingredient| !range.contains(ingredient));
     }
     ingredients.len() - rotten_ingredients.len()
+}
+
+fn day05_part2(input: &str) -> usize {
+    let (_, (mut fresh_ranges, _)) = read_input(input).unwrap();
+    fresh_ranges.sort_by_key(|range| *range.start());
+    fresh_ranges
+        .iter()
+        .fold((0, 0), |(total, index), range| {
+            let end = *range.end();
+            let start = *range.start();
+            let new_total = if index >= end {
+                total
+            } else if index < start {
+                total + end - start + 1
+            } else {
+                total + end - index
+            };
+            let new_index = max(index, *range.end());
+            (new_total, new_index)
+        })
+        .0 as usize
 }
 
 fn read_input(input: &str) -> IResult<&str, (Vec<RangeInclusive<u64>>, Vec<u64>)> {
@@ -58,5 +81,19 @@ mod tests {
         let contents = fs::read_to_string("input").unwrap();
         let result = day05_part1(&contents);
         assert_eq!(result, 638);
+    }
+
+    #[test]
+    fn part2_correct_output_for_test_input() {
+        let contents = fs::read_to_string("test_input").unwrap();
+        let result = day05_part2(&contents);
+        assert_eq!(result, 14);
+    }
+
+    #[test]
+    fn part2_correct_output_for_input() {
+        let contents = fs::read_to_string("input").unwrap();
+        let result = day05_part2(&contents);
+        assert_eq!(result, 352946349407338);
     }
 }
