@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     ops::{Index, IndexMut},
 };
@@ -16,6 +17,8 @@ fn main() {
     let contents = fs::read_to_string("input").unwrap();
     let result = day07_part1(&contents);
     println!("Day07 part 1 result: {result}");
+    let result = day07_part2(&contents);
+    println!("Day07 part 2 result: {result}");
 }
 
 fn day07_part1(input: &str) -> usize {
@@ -53,6 +56,51 @@ fn throw_beam(matrix: &mut Matrix<Cell>, pos: Position) -> usize {
         Cell::Beam => 0,
         Cell::Start => unreachable!(),
     }
+}
+
+fn day07_part2(input: &str) -> usize {
+    let (_, mut matrix) = read_input(input).unwrap();
+    let start_pos = matrix
+        .iter()
+        .find(|&pos| matrix[pos] == Cell::Start)
+        .unwrap();
+    let next = matrix
+        .get_next_position(start_pos, Direction::Down)
+        .unwrap();
+    throw_quantum_beam(&mut matrix, next, &mut HashMap::new()) + 1
+}
+
+fn throw_quantum_beam(
+    matrix: &mut Matrix<Cell>,
+    pos: Position,
+    cache: &mut HashMap<Position, usize>,
+) -> usize {
+    if cache.contains_key(&pos) {
+        return cache[&pos];
+    }
+    let value = match matrix[pos] {
+        Cell::Empty | Cell::Beam => {
+            matrix[pos] = Cell::Beam;
+            matrix
+                .get_next_position(pos, Direction::Down)
+                .map(|next| throw_quantum_beam(matrix, next, cache))
+                .unwrap_or(0)
+        }
+        Cell::Splitter => {
+            let right_count = matrix
+                .get_next_position(pos, Direction::Right)
+                .map(|next| throw_quantum_beam(matrix, next, cache))
+                .unwrap_or(0);
+            let left_count = matrix
+                .get_next_position(pos, Direction::Left)
+                .map(|next| throw_quantum_beam(matrix, next, cache))
+                .unwrap_or(0);
+            right_count + left_count + 1
+        }
+        Cell::Start => unreachable!(),
+    };
+    cache.insert(pos, value);
+    value
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -145,6 +193,7 @@ fn read_input(input: &str) -> IResult<&str, Matrix<Cell>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn part1_correct_output_for_test_input() {
         let contents = fs::read_to_string("test_input").unwrap();
@@ -157,5 +206,19 @@ mod tests {
         let contents = fs::read_to_string("input").unwrap();
         let result = day07_part1(&contents);
         assert_eq!(result, 1609);
+    }
+
+    #[test]
+    fn part2_correct_output_for_test_input() {
+        let contents = fs::read_to_string("test_input").unwrap();
+        let result = day07_part2(&contents);
+        assert_eq!(result, 40);
+    }
+
+    #[test]
+    fn part2_correct_output_for_input() {
+        let contents = fs::read_to_string("input").unwrap();
+        let result = day07_part2(&contents);
+        assert_eq!(result, 12472142047197);
     }
 }
