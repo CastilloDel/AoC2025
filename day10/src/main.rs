@@ -1,5 +1,4 @@
-use std::{collections::HashSet, fs};
-
+use itertools::Itertools;
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -9,16 +8,27 @@ use nom::{
     multi::{many1, separated_list1},
     sequence::delimited,
 };
+use std::fs;
 
 fn main() {
     let contents = fs::read_to_string("input").unwrap();
     let result = day10_part1(&contents);
     println!("Day10 part 1 result: {result}");
+    let result = day10_part2(&contents);
+    println!("Day10 part 2 result: {result}");
 }
 
 fn day10_part1(input: &str) -> usize {
     let (_, machines) = read_input(input).unwrap();
     machines.iter().map(Machine::get_minimum_presses).sum()
+}
+
+fn day10_part2(input: &str) -> usize {
+    let (_, machines) = read_input(input).unwrap();
+    machines
+        .iter()
+        .map(|machine| machine.get_minimum_presses_joltage())
+        .sum()
 }
 
 #[derive(Debug)]
@@ -30,35 +40,75 @@ struct Machine {
 
 impl Machine {
     fn get_minimum_presses(&self) -> usize {
-        Machine::get_minimum_presses_recursive(self.lights.clone(), &self.buttons, 0)
+        Machine::get_possible_minimum_presses(self.lights.clone(), &self.buttons)
+            .iter()
+            .map(|possible_presses| possible_presses.len())
+            .min()
+            .unwrap()
     }
 
-    fn get_minimum_presses_recursive(
-        lights: Vec<bool>,
-        buttons: &[Vec<usize>],
-        path_length: usize,
-    ) -> usize {
-        // Today was a good day to be a pirate
-        if path_length > 6 {
-            return usize::MAX;
+    fn get_possible_minimum_presses(lights: Vec<bool>, buttons: &[Vec<usize>]) -> Vec<Vec<usize>> {
+        let mut state = 0;
+        for (index, light) in lights.iter().enumerate() {
+            if *light {
+                state |= 1 << index;
+            }
         }
-        let light_to_change = match lights.iter().position(|light| *light) {
-            Some(index) => index,
-            None => return 0,
-        };
-        buttons
+        let buttons_operations = buttons
             .iter()
-            .filter(|button| button.contains(&light_to_change))
-            .map(|button| {
-                let mut new_lights = lights.clone();
-                for &i in button {
-                    new_lights[i] = !new_lights[i];
+            .map(|joltage_indexes| {
+                joltage_indexes
+                    .iter()
+                    .fold(0, |acc, joltage_index| acc | 1 << joltage_index)
+            })
+            .collect::<Vec<_>>();
+        (0..=buttons.len())
+            .flat_map(|length| (0..buttons.len()).combinations(length))
+            .filter(|combination| {
+                combination
+                    .into_iter()
+                    .fold(0, |acc, index| acc ^ buttons_operations[*index])
+                    == state
+            })
+            .collect()
+    }
+
+    fn get_minimum_presses_joltage(&self) -> usize {
+        Machine::get_minimum_presses_joltage_recursive(self.joltages.clone(), &self.buttons)
+            .unwrap()
+    }
+
+    fn get_minimum_presses_joltage_recursive(
+        joltages: Vec<usize>,
+        buttons: &[Vec<usize>],
+    ) -> Option<usize> {
+        if joltages.iter().all(|j| *j == 0) {
+            return Some(0);
+        }
+        let lights = joltages
+            .iter()
+            .map(|joltage| joltage % 2 != 0)
+            .collect::<Vec<_>>();
+        let possible_presses = Machine::get_possible_minimum_presses(lights, buttons);
+        possible_presses
+            .iter()
+            .filter_map(|presses| {
+                let mut new_joltages = joltages.clone();
+                for press in presses {
+                    for j in &buttons[*press] {
+                        if new_joltages[*j] == 0 {
+                            return None;
+                        };
+                        new_joltages[*j] -= 1;
+                    }
                 }
-                Machine::get_minimum_presses_recursive(new_lights, buttons, path_length + 1)
-                    .saturating_add(1)
+                for joltage in new_joltages.iter_mut() {
+                    *joltage /= 2;
+                }
+                Machine::get_minimum_presses_joltage_recursive(new_joltages, buttons)
+                    .map(|next_presses| 2 * next_presses + presses.len())
             })
             .min()
-            .unwrap_or(usize::MAX)
     }
 }
 
@@ -123,5 +173,19 @@ mod tests {
         let contents = fs::read_to_string("input").unwrap();
         let result = day10_part1(&contents);
         assert_eq!(result, 399);
+    }
+
+    #[test]
+    fn part2_correct_output_for_test_input() {
+        let contents = fs::read_to_string("test_input").unwrap();
+        let result = day10_part2(&contents);
+        assert_eq!(result, 33);
+    }
+
+    #[test]
+    fn part2_correct_output_for_input() {
+        let contents = fs::read_to_string("input").unwrap();
+        let result = day10_part2(&contents);
+        assert_eq!(result, 15631);
     }
 }
